@@ -165,7 +165,7 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     ((mod1Mask .|. controlMask , xK_l),               spawn "sxlock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\""),
     ((mod1Mask .|. controlMask .|. shiftMask , xK_q), spawn "shutdown now"),
     ((mod1Mask .|. controlMask .|. shiftMask , xK_r), spawn "reboot"),
-    ((mod1Mask .|. controlMask .|. shiftMask , xK_w), spawn "/home/fibe/.xmonad/setwallpaper.sh"),
+    ((mod1Mask .|. controlMask .|. shiftMask , xK_w), spawn "/home/fibe/.xmonad/scripts/setwallpaper.sh"),
     ((shiftMask , xF86XK_MonBrightnessDown),          spawn "xbacklight -dec 5"),
     ((shiftMask , xF86XK_MonBrightnessUp),            spawn "xbacklight -inc 5"),
     ((0 , xF86XK_MonBrightnessDown),                  spawn "xbacklight -dec 10"),
@@ -175,7 +175,7 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     ((0 , xF86XK_AudioLowerVolume),                   spawn "/usr/bin/pulseaudio-ctl down"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2-"),
     ((0 , xF86XK_AudioRaiseVolume),                   spawn "/usr/bin/pulseaudio-ctl up"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2+"),
     ((0 , xF86XK_AudioMute),                          spawn "/usr/bin/pulseaudio-ctl mute"),--"amixer set Master toggle && amixer set Headphone on && amixer set Speaker on"),
-    ((mod4Mask , xK_space),                           spawn "/home/fibe/.xmonad/switchpowgov.sh"),
+    ((mod4Mask , xK_space),                           spawn "/home/fibe/.xmonad/scripts/switchpowgov.sh"),
     ((0 , xK_Print),                                  spawn "scrot"),
     ((mod1Mask , xK_f),                               spawn "spacefm")
   ]
