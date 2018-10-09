@@ -3,10 +3,12 @@ import XMonad.Config.Xfce
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.FadeInactive
 import XMonad.Hooks.ManageDocks
+import XMonad.Hooks.ManageHelpers
 import XMonad.Hooks.EwmhDesktops
 import XMonad.Hooks.DynamicLog
 import XMonad.Util.Run(spawnPipe)
 import XMonad.Util.EZConfig(additionalKeys)
+import XMonad.Util.WindowProperties
 import Graphics.X11.ExtraTypes.XF86
 import XMonad.Layout.PerWorkspace (onWorkspace, onWorkspaces)
 import XMonad.Layout.LimitWindows
@@ -26,22 +28,25 @@ myTerminal = "urxvtc"
 
 myNormalBorderColor  = "#073642"
 myFocusedBorderColor = "#268bd2"
+myBorderWidth        = 0
 
 -- Workspaces
-myWorkspaces = ["1 - Web", "2 - Terminals", "3 - Code", "4 - Mail", "5 - Chat", "6 - Music", "7 - Media", "8 - Etc1", "9 - Etc2"]
+myWorkspaces = ["1 - Web", "2 - Terminals", "3 - Code", "4 - Games", "5 - Chat", "6 - Music", "7 - Media", "8 - Etc1", "9 - Etc2"]
 
 -- Define the workspace an app goes to
 myManageHook = composeAll . concat $
   [
       [resource  =? "stalonetray"   --> doIgnore]
-    , [className =? "Thunderbird"   --> doShift "4 - Mail"]
+    , [className =? "Steam"         --> doShift "4 - Games"]
     , [className =? "Firefox"       --> doShift "1 - Web"]
     , [className =? "Google-chrome" --> doShift "1 - Web"]
     , [className =? "Sky"           --> doShift "5 - Chat"]
     , [className =? "Slack"         --> doShift "5 - Chat"]
     , [className =? "yakyak"        --> doShift "5 - Chat"]
     , [className =? "Kodi"          --> doShift "7 - Media"]
+    , [className =? "Kodi"          --> doFullFloat]
     , [className =? "Xmessage"      --> doFloat]
+    , [isFullscreen --> (doF W.focusUp <+> doFullFloat)]
   ]
 
 myLayout     =  onWorkspaces ["1- Web", "3 - Code", "4 - Mail", "6 - Music", "7 - Media", "8 - Etc1", "9 - Etc2"] customLayout $
@@ -50,13 +55,16 @@ myLayout     =  onWorkspaces ["1- Web", "3 - Code", "4 - Mail", "6 - Music", "7 
                 onWorkspaces ["7 - Media"] mediaLayout $
                 customLayout
 
-customLayout    = avoidStruts $ smartBorders $ layoutHook defaultConfig
-terminalLayout  = avoidStruts $ smartBorders $ TallGrid 2 2 (2/3) (16/10) (5/100) ||| customLayout
-chatLayout      = avoidStruts $ smartBorders $ customLayout ||| multiCol [1] 2 (3/100) (1/5) ||| Tall 1 (3/100) (1/5)
-mediaLayout     = F.fullscreenFull Full
+customLayout    = avoidStruts $ noBorders $ layoutHook defaultConfig
+terminalLayout  = avoidStruts $ noBorders $ TallGrid 2 2 (2/3) (16/10) (5/100) ||| customLayout
+chatLayout      = avoidStruts $ noBorders $ customLayout ||| multiCol [1] 2 (3/100) (1/5) ||| Tall 1 (3/100) (1/5)
+mediaLayout     = noBorders $ F.fullscreenFull Full
+
+fadeInactiveLogHook' = fadeOutLogHook . fadeIf (isUnfocused <&&> (propertyToQuery (Not (ClassName "Google-chrome") `And` (Not (ClassName "Kodi")))))
 
 myLogHook :: X ()
-myLogHook = ewmhDesktopsLogHook
+myLogHook = fadeInactiveLogHook' fadeAmount >> ewmhDesktopsLogHook
+    where fadeAmount = 0.6
 
 myStartupHook = do
   ewmhDesktopsStartup
@@ -70,7 +78,7 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
       ((modMask .|. shiftMask, xK_Return), spawn $ XMonad.terminal conf)
 
     -- launch dmenu
-    , ((modMask,               xK_p     ), spawn "exe=`dmenu_path | dmenu -fn \"xft:Helvetica Neue:antialiasing=true:size=10\" -sb \"#268bd2\" -sf \"#eee8d5\" -nb \"#002b36\" -nf \"#93a1a1\"` && eval \"exec $exe\"")
+    , ((modMask,               xK_p     ), spawn "exe=`dmenu_path | dmenu -fn \"xft:Helvetica Neue:antialiasing=true:size=11\" -sb \"#268bd2\" -sf \"#eee8d5\" -nb \"#002b36\" -nf \"#93a1a1\"` && eval \"exec $exe\"")
 
     -- close focused window
     , ((modMask .|. shiftMask, xK_c     ), kill)
@@ -154,7 +162,7 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
 
    -- Additional bindings
    [
-    ((mod1Mask .|. controlMask , xK_l), spawn "sflock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\" && sleep 0.1; xset dpms force off"),
+    ((mod1Mask .|. controlMask , xK_l),               spawn "sxlock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\""),
     ((mod1Mask .|. controlMask .|. shiftMask , xK_q), spawn "shutdown now"),
     ((mod1Mask .|. controlMask .|. shiftMask , xK_r), spawn "reboot"),
     ((mod1Mask .|. controlMask .|. shiftMask , xK_w), spawn "/home/fibe/.xmonad/setwallpaper.sh"),
@@ -164,10 +172,10 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     ((0 , xF86XK_MonBrightnessUp),                    spawn "xbacklight -inc 10"),
     ((0 , xF86XK_KbdBrightnessDown),                  spawn "asus-kbd-backlight down"),
     ((0 , xF86XK_KbdBrightnessUp),                    spawn "asus-kbd-backlight up"),
-    ((0 , xF86XK_AudioLowerVolume),                   spawn "amixer set Master on && amixer set Headphone on && amixer set Master 2-"),
-    ((0 , xF86XK_AudioRaiseVolume),                   spawn "amixer set Master on && amixer set Headphone on && amixer set Master 2+"),
-    ((0 , xF86XK_AudioMute),                          spawn "amixer set Master toggle && amixer set Headphone on && amixer set Speaker on"),
-    ((0 , xF86XK_Launch6),                            spawn "/home/fibe/.xmonad/switchpowgov.sh"),
+    ((0 , xF86XK_AudioLowerVolume),                   spawn "/usr/bin/pulseaudio-ctl down"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2-"),
+    ((0 , xF86XK_AudioRaiseVolume),                   spawn "/usr/bin/pulseaudio-ctl up"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2+"),
+    ((0 , xF86XK_AudioMute),                          spawn "/usr/bin/pulseaudio-ctl mute"),--"amixer set Master toggle && amixer set Headphone on && amixer set Speaker on"),
+    ((mod4Mask , xK_space),                           spawn "/home/fibe/.xmonad/switchpowgov.sh"),
     ((0 , xK_Print),                                  spawn "scrot"),
     ((mod1Mask , xK_f),                               spawn "spacefm")
   ]
@@ -219,5 +227,6 @@ myConfig = defaultConfig
       , logHook            = myLogHook
       , normalBorderColor  = myNormalBorderColor
       , focusedBorderColor = myFocusedBorderColor
+      , borderWidth        = myBorderWidth
   }
 
