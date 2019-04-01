@@ -175,8 +175,8 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
    -- Additional bindings
    [
     ((modMask .|. controlMask , xK_l),               spawn "sxlock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\""),
-    ((modMask .|. controlMask .|. shiftMask , xK_q), spawn "shutdown now"),
-    ((modMask .|. controlMask .|. shiftMask , xK_r), spawn "reboot"),
+    ((modMask .|. controlMask .|. shiftMask , xK_q), spawn "systemctl poweroff"),
+    ((modMask .|. controlMask .|. shiftMask , xK_r), spawn "systemctl reboot"),
     ((modMask .|. controlMask .|. shiftMask , xK_w), spawn "/home/fibe/.xmonad/scripts/setwallpaper.sh"),
     ((shiftMask , xF86XK_MonBrightnessDown),         spawn "xbacklight -dec 5"),
     ((shiftMask , xF86XK_MonBrightnessUp),           spawn "xbacklight -inc 5"),
