@@ -16,45 +16,50 @@ import XMonad.Layout.GridVariants
 import XMonad.Layout.NoBorders
 import XMonad.Layout.MultiColumns
 import XMonad.Layout.Spacing
+import System.IO
+import System.Exit
+
 import qualified XMonad.Layout.Fullscreen as F
 import qualified Data.Map as M
 import qualified XMonad.StackSet as W
-import System.IO
-import System.Exit
+import qualified DBus as D
+import qualified DBus.Client as D
+import qualified Codec.Binary.UTF8.String as UTF8
 
 myModMask :: KeyMask
 myModMask = mod1Mask
 
 myTerminal = "urxvtc"
 
-myNormalBorderColor  = "#073642"
-myFocusedBorderColor = "#268bd2"
-myBorderWidth        = 1
+myNormalBorderColor  = "#233427"
+myFocusedBorderColor = "#54656f"
+myBorderWidth        = 3
 
 -- Workspaces
-myWorkspaces = ["1 - Web", "2 - Terminals", "3 - Code", "4 - Games", "5 - Chat", "6 - Music", "7 - Media", "8 - Etc1", "9 - Etc2"]
+myWorkspaces = ["1 - Web", "2 - Terminals", "3 - Code", "4 - Mail", "5 - Chat", "6 - Music", "7 - VM", "8 - Etc1", "9 - Etc2"]
 
 -- Define the workspace an app goes to
 myManageHook = composeAll . concat $
   [
       [resource  =? "stalonetray"   --> doIgnore]
-    , [className =? "Steam"         --> doShift "4 - Games"]
     , [className =? "Firefox"       --> doShift "1 - Web"]
     , [className =? "Google-chrome" --> doShift "1 - Web"]
-    , [className =? "Sky"           --> doShift "5 - Chat"]
+    , [className =? "Evolution"     --> doShift "4 - Mail"]
+    , [className =? "Pidgin"        --> doShift "5 - Chat"]
     , [className =? "Slack"         --> doShift "5 - Chat"]
     , [className =? "yakyak"        --> doShift "5 - Chat"]
-    , [className =? "Kodi"          --> doShift "7 - Media"]
+    , [className =? "discord"       --> doShift "5 - Chat"]
+    , [className =? "Kodi"          --> doShift "8 - Etc"]
     , [className =? "Kodi"          --> doFullFloat]
     , [className =? "Xmessage"      --> doCenterFloat]
     , [isFullscreen --> (doF W.focusUp <+> doFullFloat)]
   ]
 
 myLayout     =  avoidStruts $ smartBorders $ spacingRaw False (Border 0 5 5 5) False (Border 5 5 5 5) False  $
-                onWorkspaces ["1- Web", "3 - Code", "4 - Mail", "6 - Music", "7 - Media", "8 - Etc1", "9 - Etc2"] customLayout $
+                onWorkspaces ["1- Web", "3 - Code", "4 - Mail", "6 - Music", "8 - Etc1", "9 - Etc2"] customLayout $
                 onWorkspaces ["2 - Terminals"] terminalLayout $
                 onWorkspaces ["5 - Chat"] chatLayout $
-                onWorkspaces ["7 - Media"] mediaLayout $
+                onWorkspaces ["7 - VM"] mediaLayout $
                 customLayout
 
 customLayout    = layoutHook defaultConfig
@@ -62,15 +67,29 @@ terminalLayout  = TallGrid 2 2 (2/3) (16/10) (5/100) ||| customLayout
 chatLayout      = customLayout ||| multiCol [1] 2 (3/100) (1/5) ||| Tall 1 (3/100) (1/5)
 mediaLayout     = F.fullscreenFull Full
 
-fadeInactiveLogHook' = fadeOutLogHook . fadeIf (isUnfocused <&&> (propertyToQuery (Not (ClassName "Google-chrome") `And` (Not (ClassName "Kodi")))))
+myLogHook :: D.Client -> PP
+myLogHook dbus = def
+ { ppOutput  = dbusOutput dbus
+  , ppCurrent = wrap ("%{F" ++ xmobarWSColor ++ "} ") " %{F-}"
+  , ppTitle   = wrap ("%{F" ++ xmobarTitleColor ++ "} ") " %{F-}" . shorten 100
+  , ppSep     = " \57521 "
+  }
 
-myLogHook :: X ()
---myLogHook = fadeInactiveLogHook' fadeAmount >> ewmhDesktopsLogHook
-    --where fadeAmount = 0.6
-myLogHook = ewmhDesktopsLogHook
+-- Emit a DBus signal on log updates
+dbusOutput :: D.Client -> String -> IO ()
+dbusOutput dbus str = do
+    let signal = (D.signal objectPath interfaceName memberName) {
+            D.signalBody = [D.toVariant $ UTF8.decodeString str]
+        }
+    D.emit dbus signal
+  where
+    objectPath = D.objectPath_ "/org/xmonad/Log"
+    interfaceName = D.interfaceName_ "org.xmonad.Log"
+    memberName = D.memberName_ "Update"
 
 myStartupHook = do
   ewmhDesktopsStartup
+  spawn "$HOME/.dotfiles/scripts/polybar.sh"
   return ()
 
 myEventHook = ewmhDesktopsEventHook <+> fullscreenEventHook <+> docksEventHook
@@ -80,8 +99,11 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     -- launch a terminal
       ((modMask .|. shiftMask, xK_Return), spawn $ XMonad.terminal conf)
 
+    -- toggle struts
+    , ((modMask,               xK_b     ), sendMessage ToggleStruts)
+
     -- launch dmenu
-    , ((modMask,               xK_p     ), spawn "exe=`dmenu_path | dmenu -fn \"xft:Helvetica Neue:antialiasing=true:size=10\" -sb \"#268bd2\" -sf \"#eee8d5\" -nb \"#002b36\" -nf \"#93a1a1\"` && eval \"exec $exe\"")
+    , ((modMask,               xK_p     ), spawn "rofi -show drun")
 
     -- close focused window
     , ((modMask .|. shiftMask, xK_c     ), kill)
@@ -126,10 +148,10 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     , ((modMask,               xK_t     ), withFocused $ windows . W.sink)
 
     -- Increment the number of windows in the master area
-    , ((modMask              , xK_comma ), sendMessage (IncMasterN 1))
+    , ((modMask,               xK_comma ), sendMessage (IncMasterN 1))
 
     -- Decrement the number of windows in the master area
-    , ((modMask              , xK_period), sendMessage (IncMasterN (-1)))
+    , ((modMask,               xK_period), sendMessage (IncMasterN (-1)))
 
     -- Increment window spacing
     , ((modMask .|. shiftMask, xK_l),      incWindowSpacing 1)
@@ -168,28 +190,28 @@ myKeys conf@(XConfig {XMonad.modMask = modMask}) = M.fromList $
     -- mod-shift-{w,e,r}, Move client to screen 1, 2, or 3
     --
     [((m .|. modMask, key), screenWorkspace sc >>= flip whenJust (windows . f))
-        | (key, sc) <- zip [xK_w, xK_e, xK_r] [0..]
+        | (key, sc) <- zip [xK_w, xK_e, xK_r] [2,0,1]
         , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]]
     ++
 
    -- Additional bindings
    [
-    ((modMask .|. controlMask , xK_l),                spawn "sflock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\" && sleep 0.1; xset dpms force off"),
-    ((modMask .|. controlMask .|. shiftMask , xK_q),  spawn "shutdown now"),
-    ((modMask .|. controlMask .|. shiftMask , xK_r),  spawn "reboot"),
-    ((modMask .|. controlMask .|. shiftMask , xK_w),  spawn "/home/fibe/.xmonad/scripts/setwallpaper.sh"),
-    ((shiftMask , xF86XK_MonBrightnessDown),          spawn "xbacklight -dec 5"),
-    ((shiftMask , xF86XK_MonBrightnessUp),            spawn "xbacklight -inc 5"),
-    ((0 , xF86XK_MonBrightnessDown),                  spawn "xbacklight -dec 10"),
-    ((0 , xF86XK_MonBrightnessUp),                    spawn "xbacklight -inc 10"),
-    ((0 , xF86XK_KbdBrightnessDown),                  spawn "asus-kbd-backlight down"),
-    ((0 , xF86XK_KbdBrightnessUp),                    spawn "asus-kbd-backlight up"),
-    ((0 , xF86XK_AudioLowerVolume),                   spawn "amixer set Master on && amixer set Headphone on && amixer set Master 2-"),
-    ((0 , xF86XK_AudioRaiseVolume),                   spawn "amixer set Master on && amixer set Headphone on && amixer set Master 2+"),
-    ((0 , xF86XK_AudioMute),                          spawn "amixer set Master toggle && amixer set Headphone on && amixer set Speaker on"),
-    ((0 , xF86XK_Launch6),                            spawn "/home/fibe/.xmonad/scripts/switchpowgov.sh"),
-    ((0 , xK_Print),                                  spawn "scrot"),
-    ((mod1Mask , xK_f),                               spawn "spacefm")
+    ((modMask .|. controlMask , xK_l),               spawn "sxlock -f \"-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1\""),
+    ((modMask .|. controlMask .|. shiftMask , xK_q), spawn "systemctl poweroff"),
+    ((modMask .|. controlMask .|. shiftMask , xK_r), spawn "systemctl reboot"),
+    ((modMask .|. controlMask .|. shiftMask , xK_w), spawn "wpg -m"),
+    ((shiftMask , xF86XK_MonBrightnessDown),         spawn "xbacklight -dec 5 -time 200 -steps 10"),
+    ((shiftMask , xF86XK_MonBrightnessUp),           spawn "xbacklight -inc 5 -time 200 -steps 10"),
+    ((0 , xF86XK_MonBrightnessDown),                 spawn "xbacklight -dec 10 -time 200 -steps 10"),
+    ((0 , xF86XK_MonBrightnessUp),                   spawn "xbacklight -inc 10 -time 200 -steps 10"),
+    ((0 , xF86XK_KbdBrightnessDown),                 spawn "asus-kbd-backlight down"),
+    ((0 , xF86XK_KbdBrightnessUp),                   spawn "asus-kbd-backlight up"),
+    ((0 , xF86XK_AudioLowerVolume),                  spawn "/usr/bin/pulseaudio-ctl down"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2-"),
+    ((0 , xF86XK_AudioRaiseVolume),                  spawn "/usr/bin/pulseaudio-ctl up"),--"amixer set Master on && amixer set Headphone on && amixer set Master 2+"),
+    ((0 , xF86XK_AudioMute),                         spawn "/usr/bin/pulseaudio-ctl mute"),--"amixer set Master toggle && amixer set Headphone on && amixer set Speaker on"),
+    ((mod4Mask , xK_space),                          spawn "/home/filip/.xmonad/scripts/switchpowgov.sh"),
+    ((0 , xK_Print),                                 spawn "scrot"),
+    ((modMask , xK_f),                               spawn "spacefm")
   ]
 ------------------------------------------------------------------------
 -- Mouse bindings: default actions bound to mouse events
@@ -208,26 +230,25 @@ myMouseBindings (XConfig {XMonad.modMask = modMask}) = M.fromList $
   ]
 
 -- Xmobar config
-xmobarWSColor     = "#268bd2"
+xmobarWSColor     = "#808972"
 xmobarWSHighlight = ""
-xmobarTitleColor  = "#2aa198"
+xmobarTitleColor  = "#3d5d47"
 
 myBar = "xmobar"
 
-myPP = xmobarPP
-         {
-              ppCurrent = xmobarColor xmobarWSColor xmobarWSHighlight . wrap " " " "
-            , ppTitle   = xmobarColor xmobarTitleColor "" . shorten 100
-            , ppSep     = " <fn=1><fc=#586e75>\57521</fc></fn> "
-         }
-
-toggleStrutsKey XConfig {XMonad.modMask = modMask} = (modMask, xK_b)
-
 -- Run XMonad
-main = xmonad =<< statusBar myBar myPP toggleStrutsKey myConfig
+main = do
+  dbus <- D.connectSession
+  D.requestName dbus (D.busName_ "org.xmonad.Log")
+    [D.nameAllowReplacement, D.nameReplaceExisting, D.nameDoNotQueue]
+
+  xmonad
+    $ ewmh
+    $ docks
+    $ myConfig { logHook = dynamicLogWithPP (myLogHook dbus) }
 
 myConfig = defaultConfig
-  {
+ {
         terminal           = myTerminal
       , workspaces         = myWorkspaces
       , manageHook         = myManageHook
@@ -237,7 +258,6 @@ myConfig = defaultConfig
       , modMask            = myModMask
       , startupHook        = myStartupHook
       , handleEventHook    = myEventHook
-      , logHook            = myLogHook
       , normalBorderColor  = myNormalBorderColor
       , focusedBorderColor = myFocusedBorderColor
       , borderWidth        = myBorderWidth
